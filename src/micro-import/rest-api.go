@@ -39,7 +39,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 		// error returned by db api
 	}
 	// TODO : write a json response with potential errors*/
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +84,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			}*/
 
-			w.WriteHeader(http.StatusCreated)
+			w.WriteHeader(http.StatusOK)
 			fmt.Fprint(w, mDbEntry)
 
 		} else {
