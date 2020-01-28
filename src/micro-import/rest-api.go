@@ -103,7 +103,7 @@ func main() {
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", home)
 
-	router.HandleFunc("/createDB", createDatabase)
+	router.HandleFunc("/createDB", createDatabase).Methods("POST")
 	router.HandleFunc("/upload", uploadImage).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
