@@ -39,6 +39,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 		// error returned by db api
 	}
 	// TODO : write a json response with potential errors*/
+	w.WriteHeader(http.StatusCreated)
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
@@ -102,8 +103,8 @@ func main() {
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", home)
 
-	router.HandleFunc("/import/createdb", createDatabase)
-	router.HandleFunc("/import/upload", uploadImage).Methods("POST")
+	router.HandleFunc("/createDB", createDatabase)
+	router.HandleFunc("/upload", uploadImage).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
