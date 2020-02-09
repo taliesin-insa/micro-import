@@ -65,8 +65,6 @@ func home(w http.ResponseWriter, r *http.Request) {
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
 
-	// TODO : erase files on the shared volume
-
 	// FIXME : for v0 we erase previous data in db, needs to be changed later
 	client := &http.Client{}
 	eraseRequest, _ := http.NewRequest(http.MethodPut,"http://database-api.gitlab-managed-apps.svc.cluster.local:8080/db/delete/all", nil)
@@ -79,7 +77,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 		// error returned by db api
 		fmt.Fprint(w, eraseErr)
 	}
-	// TODO : write a json response with potential errors
+
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
@@ -131,40 +129,47 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 			if unmarshallErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println("cannot unmarshall")
+				fmt.Println(unmarshallErr)
+				fmt.Fprint(w, unmarshallErr)
 			}
 
 			// TODO: ask for a single Picture endpoint in db microservice
+
 			dbListOfEntries := [1]DBEntry{dbEntry}
 			mDbEntry, _ := json.Marshal(dbListOfEntries)
 
 			dbInsertRes, dbInsertErr := http.Post("http://database-api.gitlab-managed-apps.svc.cluster.local:8080/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
 
 			if dbInsertErr == nil && dbInsertRes.StatusCode == http.StatusCreated {
-				dbResBody, dbResErr := ioutil.ReadAll(dbInsertRes.Body)
+				_, dbReadErr := ioutil.ReadAll(dbInsertRes.Body)
 
-				if dbResErr != nil {
+				if dbReadErr != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					fmt.Println(dbResErr)
-					fmt.Fprint(w, dbResErr)
+					fmt.Println(dbReadErr)
+					fmt.Fprint(w, dbReadErr)
 					return
 				}
 
-				fmt.Println(dbResBody)
 				w.WriteHeader(http.StatusOK)
 			} else {
 				// error returned by db api
 				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Println(dbInsertErr)
+				fmt.Fprint(w, dbInsertErr)
 			}
 
 		} else {
 			// creating file on volume error
 			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Println(fileErr)
+			fmt.Fprint(w, fileErr)
 		}
 
 	} else {
 		// file upload/multipart form error
-		w.WriteHeader(http.StatusNotAcceptable)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println(formFileErr)
+		fmt.Fprint(w, formFileErr)
 	}
 }
 
