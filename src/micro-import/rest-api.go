@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -13,15 +15,49 @@ import (
 const MaxImageSize = 32 << 20
 const VolumePath = "/snippets/"
 
-type Picture struct {
-	Value string
-	Url string
+type Meta struct {
+	Type string
+	URL  string
 }
 
-/*type UploadResponse struct {
+type Location struct {
+	Type    string
+	Polygon [][2]int
+	Id      string
+}
+
+type Data struct {
+	Type       string
+	LocationId string
+	Value      string
+	Id         string
+}
+
+type PiFFStruct struct {
+	Meta     Meta
+	Location []Location
+	Data     []Data
+	Children []int
+	Parent   int
+}
+
+type PiFFRequest struct {
 	Path string
-	// TODO: include error info
-}*/
+}
+
+type DBEntry struct {
+	// Piff
+	PiFF PiFFStruct `json:"PiFF"`
+	// Url fileserver
+	Url string `json:"Url"`
+	// Flags
+	Annotated  bool `json:"Annotated"`
+	Corrected  bool `json:"Corrected"`
+	SentToReco bool `json:"SentToReco"`
+	SentToUser bool `json:"SentToUser"`
+	Unreadable bool `json:"Unreadable"`
+}
+
 
 func home(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "you're talking to the import microservice")
@@ -29,17 +65,19 @@ func home(w http.ResponseWriter, r *http.Request) {
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
 
-	/*// FIXME : for v0 we erase previous data in db, needs to be changed later
-	eraseResponse, eraseErr := http.Get("http://database:8080/db/delete/all")
+	// FIXME : for v0 we erase previous data in db, needs to be changed later
+	client := &http.Client{}
+	eraseRequest, _ := http.NewRequest(http.MethodPut,"http://database-api.gitlab-managed-apps.svc.cluster.local:8080/db/delete/all", nil)
+	eraseResponse, eraseErr := client.Do(eraseRequest)
 
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusAccepted {
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
+		fmt.Fprint(w, eraseErr)
 	}
-	// TODO : write a json response with potential errors*/
-	w.WriteHeader(http.StatusOK)
+
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
@@ -53,53 +91,90 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		// FIXME : we use the filename provided by the user, input check or decide of a naming policy for files
 		path := VolumePath+formFileHeader.Filename
 
+		fmt.Println(path)
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
 		if fileErr == nil {
 			defer file.Close()
 			io.Copy(file, formFile)
 
-			dbEntry := Picture{
-				Value: "",
-				Url:   path,
+			piffReq := PiFFRequest{Path:path}
+			piffReqJson, _ := json.Marshal(piffReq)
+
+			convertRes, convertErr := http.Post("http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345/convert/nothing", "application/json", bytes.NewBuffer(piffReqJson))
+
+			if convertErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Println(convertErr)
+				fmt.Fprint(w, convertErr)
+				return
 			}
 
-			mDbEntry, _ := json.Marshal(dbEntry)
+			convertResBody, convertResErr := ioutil.ReadAll(convertRes.Body)
 
-			/*
+			if convertResErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Println(convertResErr)
+				fmt.Fprint(w, convertResErr)
+				return
+			}
+
+			var piff PiFFStruct
+			unmarshallErr := json.Unmarshal(convertResBody, &piff)
+
+			dbEntry := DBEntry{
+				PiFF: piff,
+				Url:  path,
+			}
+
+			if unmarshallErr != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Println(unmarshallErr)
+				fmt.Fprint(w, unmarshallErr)
+			}
+
 			// TODO: ask for a single Picture endpoint in db microservice
-			dbInsertRes, dbInsertErr := http.Post("http://database:8080/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
+
+			dbListOfEntries := [1]DBEntry{dbEntry}
+			mDbEntry, _ := json.Marshal(dbListOfEntries)
+
+			dbInsertRes, dbInsertErr := http.Post("http://database-api.gitlab-managed-apps.svc.cluster.local:8080/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
 
 			if dbInsertErr == nil && dbInsertRes.StatusCode == http.StatusCreated {
-				uploadRes := UploadResponse{
-					Path: path,
+				_, dbReadErr := ioutil.ReadAll(dbInsertRes.Body)
+
+				if dbReadErr != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					fmt.Println(dbReadErr)
+					fmt.Fprint(w, dbReadErr)
+					return
 				}
 
-				mUploadRes, _ := json.Marshal(uploadRes)
-
-				w.WriteHeader(http.StatusCreated)
-				fmt.Fprint(w, mUploadRes)
+				w.WriteHeader(http.StatusOK)
 			} else {
 				// error returned by db api
 				w.WriteHeader(http.StatusInternalServerError)
-			}*/
-
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, mDbEntry)
+				fmt.Println(dbInsertErr)
+				fmt.Fprint(w, dbInsertErr)
+			}
 
 		} else {
 			// creating file on volume error
 			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Println(fileErr)
+			fmt.Fprint(w, fileErr)
 		}
 
 	} else {
 		// file upload/multipart form error
-		w.WriteHeader(http.StatusNotAcceptable)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println(formFileErr)
+		fmt.Fprint(w, formFileErr)
 	}
 }
 
 func main() {
-
+	
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", home)
 
@@ -108,4 +183,3 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
-
