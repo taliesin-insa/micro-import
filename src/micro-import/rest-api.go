@@ -75,7 +75,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
-		fmt.Fprint(w, eraseErr)
+		fmt.Fprint(w, eraseErr.Error())
 	}
 
 }
@@ -106,7 +106,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			if convertErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Println(convertErr)
-				fmt.Fprint(w, convertErr)
+				fmt.Fprint(w, convertErr.Error())
 				return
 			}
 
@@ -115,7 +115,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			if convertResErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Println(convertResErr)
-				fmt.Fprint(w, convertResErr)
+				fmt.Fprint(w, convertResErr.Error())
 				return
 			}
 
@@ -130,7 +130,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			if unmarshallErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Println(unmarshallErr)
-				fmt.Fprint(w, unmarshallErr)
+				fmt.Fprint(w, unmarshallErr.Error())
 			}
 
 			// TODO: ask for a single Picture endpoint in db microservice
@@ -146,7 +146,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 				if dbReadErr != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Println(dbReadErr)
-					fmt.Fprint(w, dbReadErr)
+					fmt.Fprint(w, dbReadErr.Error())
 					return
 				}
 
@@ -155,21 +155,21 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 				// error returned by db api
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Println(dbInsertErr)
-				fmt.Fprint(w, dbInsertErr)
+				fmt.Fprint(w, dbInsertErr.Error())
 			}
 
 		} else {
 			// creating file on volume error
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Println(fileErr)
-			fmt.Fprint(w, fileErr)
+			fmt.Fprint(w, fileErr.Error())
 		}
 
 	} else {
 		// file upload/multipart form error
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Println(formFileErr)
-		fmt.Fprint(w, formFileErr)
+		fmt.Fprint(w, formFileErr.Error())
 	}
 }
 
