@@ -23,7 +23,6 @@ spec:
       containers:
         - name: import
           image: clyde.local:5005/taliesin/micro-import/master:prod
-          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -68,6 +67,9 @@ spec:
           volumeMounts:
             - mountPath: "/snippets/"
               name: file-server-dev
+          env:
+            - name: MICRO_ENVIRONMENT
+              value: "dev"
       volumes:
         - name: file-server-dev
           persistentVolumeClaim:
