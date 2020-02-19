@@ -15,6 +15,9 @@ import (
 const MaxImageSize = 32 << 20
 const VolumePath = "/snippets/"
 
+var DatabaseAPI string
+var ConversionAPI string
+
 type Meta struct {
 	Type string
 	URL  string
@@ -67,7 +70,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 
 	// FIXME : for v0 we erase previous data in db, needs to be changed later
 	client := &http.Client{}
-	eraseRequest, _ := http.NewRequest(http.MethodPut,"http://database-api.gitlab-managed-apps.svc.cluster.local:8080/db/delete/all", nil)
+	eraseRequest, _ := http.NewRequest(http.MethodPut, DatabaseAPI+"/db/delete/all", nil)
 	eraseResponse, eraseErr := client.Do(eraseRequest)
 
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusAccepted {
@@ -101,7 +104,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			piffReq := PiFFRequest{Path:path}
 			piffReqJson, _ := json.Marshal(piffReq)
 
-			convertRes, convertErr := http.Post("http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345/convert/nothing", "application/json", bytes.NewBuffer(piffReqJson))
+			convertRes, convertErr := http.Post(ConversionAPI+"/convert/nothing", "application/json", bytes.NewBuffer(piffReqJson))
 
 			if convertErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -138,7 +141,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			dbListOfEntries := [1]DBEntry{dbEntry}
 			mDbEntry, _ := json.Marshal(dbListOfEntries)
 
-			dbInsertRes, dbInsertErr := http.Post("http://database-api.gitlab-managed-apps.svc.cluster.local:8080/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
+			dbInsertRes, dbInsertErr := http.Post(DatabaseAPI+"/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
 
 			if dbInsertErr == nil && dbInsertRes.StatusCode == http.StatusCreated {
 				_, dbReadErr := ioutil.ReadAll(dbInsertRes.Body)
@@ -174,7 +177,17 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	
+
+	if os.Getenv("MICRO_ENVIRONMENT") == "production" {
+		DatabaseAPI  = "http://database-api.gitlab-managed-apps.svc.cluster.local:8080"
+		ConversionAPI = "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
+		fmt.Println("Started in production environment.")
+	} else {
+		DatabaseAPI = "http://database-api-dev.gitlab-managed-apps.svc.cluster.local:8080"
+		ConversionAPI = "http://conversion-api-dev.gitlab-managed-apps.svc.cluster.local:12345"
+		fmt.Println("Started in dev environment.")
+	}
+
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", home)
 

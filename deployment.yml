@@ -29,6 +29,9 @@ spec:
           volumeMounts:
             - mountPath: "/snippets/"
               name: file-server
+          env:
+            - name: MICRO_ENVIRONMENT
+              value: "production"
       volumes:
         - name: file-server
           persistentVolumeClaim:
