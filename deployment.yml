@@ -22,10 +22,10 @@ spec:
     spec:
       containers:
         - name: import
-          image: clyde.local:5005/taliesin/micro-import/master:latest
+          image: clyde.local:5005/taliesin/micro-import/master:prod
           imagePullPolicy: Always
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           volumeMounts:
             - mountPath: "/snippets/"
               name: file-server
@@ -33,3 +33,39 @@ spec:
         - name: file-server
           persistentVolumeClaim:
             claimName: file-server-claim
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: import-dev
+  namespace: gitlab-managed-apps
+  labels:
+    app: import-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: import-dev
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 33%
+  template:
+    metadata:
+      labels:
+        app: import-dev
+    spec:
+      containers:
+        - name: import-dev
+          image: clyde.local:5005/taliesin/micro-import/master:dev
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - mountPath: "/snippets/"
+              name: file-server-dev
+      volumes:
+        - name: file-server-dev
+          persistentVolumeClaim:
+            claimName: file-server-dev-claim

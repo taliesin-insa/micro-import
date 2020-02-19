@@ -5,7 +5,8 @@ services:
 
 stages:
   - build
-  - deploy
+  - dev
+  - production
 
 before_script:
   - export REGISTRY_HOST="clyde.local:5005"
@@ -18,12 +19,12 @@ build:
   script:
     - docker login -u nobody -p nobody ${REGISTRY_HOST}
     - docker build -t ${CONTAINER_IMAGE_SHA} .
-    - docker tag ${CONTAINER_IMAGE_SHA} ${CONTAINER_IMAGE}:latest
+    - docker tag ${CONTAINER_IMAGE_SHA} ${CONTAINER_IMAGE}:dev
     - docker push ${CONTAINER_IMAGE_SHA}
-    - docker push ${CONTAINER_IMAGE}:latest
+    - docker push ${CONTAINER_IMAGE}:dev
 
-deploy:
-  stage: deploy
+dev:
+  stage: dev
   image: dtzar/helm-kubectl
   script:
     - kubectl config set-cluster k8s --server="${KUBE_SERVER}" --certificate-authority=${CERTIFICATE_AUTHORITY_DATA} --embed-certs=true
@@ -32,4 +33,20 @@ deploy:
     - kubectl config use-context default
     - kubectl apply -f deployment.yml
     - kubectl apply -f service.yml
-    - kubectl set image deployment/import import=${CONTAINER_IMAGE} --record -n gitlab-managed-apps
+    - kubectl set image deployment/import-dev import-dev=${CONTAINER_IMAGE_SHA} --record -n gitlab-managed-apps
+
+production:
+  stage: production
+  when: manual
+  image: docker:latest
+  script:
+    - wget -q https://storage.googleapis.com/kubernetes-release/release/v1.17.3/bin/linux/amd64/kubectl -O /usr/local/bin/kubectl && chmod +x /usr/local/bin/kubectl
+    - docker tag ${CONTAINER_IMAGE}:dev ${CONTAINER_IMAGE}:prod
+    - docker push ${CONTAINER_IMAGE}:prod
+    - kubectl config set-cluster k8s --server="${KUBE_SERVER}" --certificate-authority=${CERTIFICATE_AUTHORITY_DATA} --embed-certs=true
+    - kubectl config set-credentials gitlab --token="${USER_TOKEN}"
+    - kubectl config set-context default --cluster=k8s --user=gitlab
+    - kubectl config use-context default
+    - kubectl apply -f deployment.yml
+    - kubectl apply -f service.yml
+    - kubectl set image deployment/import import=${CONTAINER_IMAGE_SHA} --record -n gitlab-managed-apps
