@@ -4,6 +4,7 @@ services:
   - docker:dind
 
 stages:
+  - test
   - build
   - dev
   - production
@@ -13,6 +14,7 @@ before_script:
   - export CONTAINER_IMAGE="${REGISTRY_HOST}/${CI_PROJECT_PATH}/master"
   - export CONTAINER_IMAGE_SHA="${CONTAINER_IMAGE}:${CI_COMMIT_SHORT_SHA}"
   - export KUBE_SERVER="https://10.133.33.49:6443"
+  - export CGO_ENABLED=0
 
 build:
   stage: build
@@ -22,6 +24,15 @@ build:
     - docker tag ${CONTAINER_IMAGE_SHA} ${CONTAINER_IMAGE}:dev
     - docker push ${CONTAINER_IMAGE_SHA}
     - docker push ${CONTAINER_IMAGE}:dev
+
+test:
+  stage: test
+  image: golang:alpine
+  script:
+    - cd src/${CI_PROJECT_NAME}
+    - apk add --no-cache curl git
+    - go get -d ./...
+    - go test --cover -v
 
 dev:
   stage: dev

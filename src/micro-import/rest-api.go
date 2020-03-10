@@ -13,7 +13,7 @@ import (
 )
 
 const MaxImageSize = 32 << 20
-const VolumePath = "/snippets/"
+var VolumePath = "/snippets/"
 
 var DatabaseAPI string
 var ConversionAPI string
@@ -75,16 +75,26 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusAccepted {
 		w.WriteHeader(http.StatusOK)
+	} else if eraseErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, eraseErr.Error())
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
-		fmt.Fprint(w, eraseErr.Error())
+		fmt.Fprint(w, eraseResponse.Body)
 	}
 
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
-	r.ParseMultipartForm(MaxImageSize)
+	parseError := r.ParseMultipartForm(MaxImageSize)
+
+	if parseError != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println(parseError)
+		fmt.Fprint(w, parseError.Error())
+		return
+	}
 
 	formFile, formFileHeader, formFileErr := r.FormFile("file")
 
