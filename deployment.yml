@@ -31,6 +31,10 @@ spec:
           env:
             - name: MICRO_ENVIRONMENT
               value: "production"
+            - name: DATABASE_API_URL
+              value: "http://database-api.gitlab-managed-apps.svc.cluster.local:8080"
+            - name: CONVERSION_API_URL
+              value: "http://conversion-dev-api.gitlab-managed-apps.svc.cluster.local:8080"
       volumes:
         - name: file-server
           persistentVolumeClaim:
@@ -70,6 +74,10 @@ spec:
           env:
             - name: MICRO_ENVIRONMENT
               value: "dev"
+            - name: DATABASE_API_URL
+              value: "http://database-dev-api.gitlab-managed-apps.svc.cluster.local:8080"
+            - name: CONVERSION_API_URL
+              value: "http://conversion-dev-api.gitlab-managed-apps.svc.cluster.local:8080"
       volumes:
         - name: file-server-dev
           persistentVolumeClaim:
