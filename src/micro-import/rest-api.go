@@ -202,7 +202,7 @@ func main() {
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", home)
+	router.HandleFunc("/import/", home)
 
 	router.HandleFunc("/import/createDB", createDatabase).Methods("POST")
 	router.HandleFunc("/import/upload", uploadImage).Methods("POST")
