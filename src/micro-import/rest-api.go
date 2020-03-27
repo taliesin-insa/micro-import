@@ -185,19 +185,23 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	dbEnvVal, dbEnvExists := os.LookupEnv("DATABASE_API_URL")
+	convertEnvVal, convertEnvExists := os.LookupEnv("CONVERSION_API_URL")
 
-	if os.Getenv("MICRO_ENVIRONMENT") == "production" {
-		DatabaseAPI  = "http://database-api.gitlab-managed-apps.svc.cluster.local:8080"
-		ConversionAPI = "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
-		fmt.Println("Started in production environment.")
+	if dbEnvExists {
+		DatabaseAPI = dbEnvVal
 	} else {
-		DatabaseAPI = "http://database-api-dev.gitlab-managed-apps.svc.cluster.local:8080"
-		ConversionAPI = "http://conversion-api-dev.gitlab-managed-apps.svc.cluster.local:12345"
-		fmt.Println("Started in dev environment.")
+		DatabaseAPI = "http://database-api.gitlab-managed-apps.svc.cluster.local:8080"
 	}
 
+	if convertEnvExists {
+		ConversionAPI = convertEnvVal
+	} else {
+		ConversionAPI = "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
+	}
+	
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/import", home)
+	router.HandleFunc("/", home)
 
 	router.HandleFunc("/import/createDB", createDatabase).Methods("POST")
 	router.HandleFunc("/import/upload", uploadImage).Methods("POST")
