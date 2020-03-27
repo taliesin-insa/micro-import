@@ -148,9 +148,9 @@ func TestUploadImageNoMultipartForm(t *testing.T) {
 			status, http.StatusBadRequest)
 	}
 
-	if message := string(recorder.Body.Bytes()) ; message != "missing form body" {
+	if message := string(recorder.Body.Bytes()) ; message != "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)" {
 		t.Errorf("handler returned wrong response body: got %v want %v",
-			message, "missing form body")
+			message, "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)")
 	}
 
 }

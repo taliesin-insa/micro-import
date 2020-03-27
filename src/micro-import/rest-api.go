@@ -81,7 +81,8 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
-		log.Printf("[ERROR] Error in response from db/delete/all: %v", eraseResponse.Body)
+		eraseResponseBody, _ := ioutil.ReadAll(eraseResponse.Body)
+		log.Printf("[ERROR] Error in response from db/delete/all: %v", string(eraseResponseBody))
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error in response from database")
 	}
 
@@ -199,7 +200,7 @@ func main() {
 	} else {
 		ConversionAPI = "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
 	}
-	
+
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", home)
 
