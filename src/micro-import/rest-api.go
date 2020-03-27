@@ -76,12 +76,13 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusAccepted {
 		w.WriteHeader(http.StatusOK)
 	} else if eraseErr != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, eraseErr.Error())
+		log.Printf("[ERROR] Error in call to db/delete/all: %v", eraseErr.Error())
+		fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to database")
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
-		fmt.Fprint(w, eraseResponse.Body)
+		log.Printf("[ERROR] Error in response from db/delete/all: %v", eraseResponse.Body)
+		fmt.Fprint(w ,"[MICRO-IMPORT] Error in response from database")
 	}
 
 }
@@ -91,8 +92,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 	if parseError != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println(parseError)
-		fmt.Fprint(w, parseError.Error())
+		log.Printf("[ERROR] Parse multipart form: %v", parseError.Error())
+		fmt.Fprint(w ,"[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)")
 		return
 	}
 
@@ -104,7 +105,6 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		// FIXME : we use the filename provided by the user, input check or decide of a naming policy for files
 		path := VolumePath+formFileHeader.Filename
 
-		fmt.Println(path)
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
 		if fileErr == nil {
@@ -118,8 +118,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 			if convertErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println(convertErr)
-				fmt.Fprint(w, convertErr.Error())
+				log.Printf("[ERROR] Error in call to convert/nothing: %v", convertErr.Error())
+				fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to conversion")
 				return
 			}
 
@@ -127,8 +127,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 			if convertResErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println(convertResErr)
-				fmt.Fprint(w, convertResErr.Error())
+				log.Printf("[ERROR] Error parsing convert/nothing: %v", convertResErr.Error())
+				fmt.Fprint(w ,"[MICRO-IMPORT] Error parsing response from conversion")
 				return
 			}
 
@@ -146,8 +146,6 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprint(w, unmarshallErr.Error())
 			}
 
-			// TODO: ask for a single Picture endpoint in db microservice
-
 			dbListOfEntries := [1]DBEntry{dbEntry}
 			mDbEntry, _ := json.Marshal(dbListOfEntries)
 
@@ -158,8 +156,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 				if dbReadErr != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					fmt.Println(dbReadErr)
-					fmt.Fprint(w, dbReadErr.Error())
+					log.Printf("[ERROR] Error parsing db/insert: %v", dbReadErr.Error())
+					fmt.Fprint(w ,"[MICRO-IMPORT] Error parsing response from database")
 					return
 				}
 
@@ -167,22 +165,22 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			} else {
 				// error returned by db api
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println(dbInsertErr)
-				fmt.Fprint(w, dbInsertErr.Error())
+				log.Printf("[ERROR] Error in call to db/insert: %v", dbInsertErr.Error())
+				fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to database")
 			}
 
 		} else {
 			// creating file on volume error
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Println(fileErr)
-			fmt.Fprint(w, fileErr.Error())
+			log.Printf("[ERROR] Cannot open file %v: %v", path, fileErr.Error())
+			fmt.Fprintf(w ,"[MICRO-IMPORT] Couldn't write provided file %v)", path)
 		}
 
 	} else {
 		// file upload/multipart form error
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println(formFileErr)
-		fmt.Fprint(w, formFileErr.Error())
+		log.Printf("[ERROR] Parse multipart form: %v", formFileErr.Error())
+		fmt.Fprint(w ,"[MICRO-IMPORT] Couldn't parse multipart form (key file probably missing/unreadable)")
 	}
 }
 
