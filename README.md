@@ -3,17 +3,7 @@ A microservice preparing and importing snippets and metadata files for use in th
 
 ### Exposed REST API
 
-**POST */createDB***  
-
-**Request body**: Nothing expected for now. 
-
-**Returned data**: a 200 status if everything went well or a 500 status if something was wrong with the error message as body.
-
-**POST */upload***
-
-**Request body**: multipart form data containing at key "file" the content of the snippet to import
-
-**Returned data**: a 200 status if everything went well or a 4xx or 5xx status if something was wrong with the error message as body.
+See [the API specification](api.md).
 
 ## Commits
 The title of a commit must follow this pattern : \<type>(\<scope>): \<subject>
