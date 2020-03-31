@@ -42,6 +42,9 @@ var EmptyPiFF = PiFFStruct{
 	Parent:   0,
 }
 
+var InsertedPath string
+var InsertedRealFilename string
+
 func MockDatabaseMicroservice() *httptest.Server {
 
 	mockedServer := httptest.NewServer(
@@ -59,6 +62,9 @@ func MockDatabaseMicroservice() *httptest.Server {
 				} else {
 					w.WriteHeader(http.StatusCreated)
 				}
+
+				InsertedPath = data[0].Url
+				InsertedRealFilename = data[0].Filename
 
 			}
 		}))
@@ -188,6 +194,8 @@ func TestUploadImageMultipartForm(t *testing.T) {
 	VolumePath, _ = ioutil.TempDir("", "")
 	VolumePath+="/"
 
+	PodName = "podname"
+
 	mockedConversionServer := MockConversionMicroservice()
 	mockedDBServer := MockDatabaseMicroservice()
 
@@ -212,8 +220,12 @@ func TestUploadImageMultipartForm(t *testing.T) {
 			status, http.StatusOK)
 	}
 
-	if _, err := os.Stat(VolumePath+"sample.txt"); err != nil {
+	if _, err := os.Stat(InsertedPath); err != nil {
 		t.Error("file was not saved to volume")
+	}
+
+	if InsertedRealFilename != "sample.txt" {
+		t.Errorf("the name of the file before renaming was not correctly saved, got %v want %v", InsertedRealFilename, "sample.txt")
 	}
 
 	os.RemoveAll(VolumePath)
