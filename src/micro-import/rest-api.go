@@ -10,6 +10,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 )
 
 const MaxImageSize = 32 << 20
@@ -51,14 +53,15 @@ type PiFFRequest struct {
 type DBEntry struct {
 	// Piff
 	PiFF PiFFStruct `json:"PiFF"`
-	// Url fileserver
-	Url string `json:"Url"`
+	Url      string     `json:"Url"`      //The URL on our fileserver
+	Filename string     `json:"Filename"` //The original name of the file
 	// Flags
 	Annotated  bool `json:"Annotated"`
 	Corrected  bool `json:"Corrected"`
 	SentToReco bool `json:"SentToReco"`
 	SentToUser bool `json:"SentToUser"`
 	Unreadable bool `json:"Unreadable"`
+	Annotator string `json:"Annotator"`
 }
 
 
@@ -103,8 +106,17 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 	if formFileErr == nil {
 		defer formFile.Close()
 
-		// FIXME : we use the filename provided by the user, input check or decide of a naming policy for files
-		path := VolumePath+formFileHeader.Filename
+		now := time.Now()
+		nsec := now.UnixNano()
+		podname, hostnameErr := os.Hostname()
+
+		if hostnameErr != nil {
+			panic("[PANIC] Could not get hostname")
+		}
+
+		extension := filepath.Ext(formFileHeader.Filename)
+		path := VolumePath+string(nsec)+podname+"."+extension
+		fmt.Println(path)
 
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
@@ -139,6 +151,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			dbEntry := DBEntry{
 				PiFF: piff,
 				Url:  path,
+				Filename: formFileHeader.Filename,
 			}
 
 			if unmarshallErr != nil {
