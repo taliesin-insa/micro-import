@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -19,6 +20,7 @@ var VolumePath = "/snippets/"
 
 var DatabaseAPI string
 var ConversionAPI string
+var PodName string
 
 type Meta struct {
 	Type string
@@ -108,14 +110,9 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 		now := time.Now()
 		nsec := now.UnixNano()
-		podname, hostnameErr := os.Hostname()
-
-		if hostnameErr != nil {
-			panic("[PANIC] Could not get hostname")
-		}
 
 		extension := filepath.Ext(formFileHeader.Filename)
-		path := VolumePath+string(nsec)+podname+"."+extension
+		path := VolumePath+strconv.FormatInt(nsec, 10)+"_"+PodName+extension
 		fmt.Println(path)
 
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
@@ -177,6 +174,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 				}
 
 				w.WriteHeader(http.StatusOK)
+				fmt.Fprintf(w, "%v", nsec)
 			} else {
 				// error returned by db api
 				w.WriteHeader(http.StatusInternalServerError)
@@ -216,6 +214,14 @@ func main() {
 		ConversionAPI = convertEnvVal
 	} else {
 		ConversionAPI = "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
+	}
+
+	hostname, hostnameErr := os.Hostname()
+
+	if hostnameErr == nil {
+		PodName = hostname
+	} else {
+		panic("[PANIC] Could not get hostname")
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
