@@ -109,8 +109,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
 		if fileErr == nil {
-			defer file.Close()
 			io.Copy(file, formFile)
+			file.Close() // closing file now so it can be read by conversion
 
 			piffReq := PiFFRequest{Path:path}
 			piffReqJson, _ := json.Marshal(piffReq)
@@ -143,8 +143,9 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 			if unmarshallErr != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println(unmarshallErr)
-				fmt.Fprint(w, unmarshallErr.Error())
+				log.Printf("[ERROR] Error unmarshalling json received from conversion : %v", unmarshallErr.Error())
+				fmt.Fprint(w ,"[MICRO-IMPORT] Error parsing response from conversion")
+				return
 			}
 
 			dbListOfEntries := [1]DBEntry{dbEntry}
@@ -168,6 +169,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				log.Printf("[ERROR] Error in call to db/insert: %v", dbInsertErr.Error())
 				fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to database")
+				return
 			}
 
 		} else {
@@ -175,6 +177,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			log.Printf("[ERROR] Cannot open file %v: %v", path, fileErr.Error())
 			fmt.Fprintf(w ,"[MICRO-IMPORT] Couldn't write provided file %v)", path)
+			return
 		}
 
 	} else {
@@ -182,6 +185,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Printf("[ERROR] Parse multipart form: %v", formFileErr.Error())
 		fmt.Fprint(w ,"[MICRO-IMPORT] Couldn't parse multipart form (key file probably missing/unreadable)")
+		return
 	}
 }
 
