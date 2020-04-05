@@ -70,10 +70,10 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 
 	// FIXME : for v0 we erase previous data in db, needs to be changed later
 	client := &http.Client{}
-	eraseRequest, _ := http.NewRequest(http.MethodPut, DatabaseAPI+"/db/delete/all", nil)
+	eraseRequest, _ := http.NewRequest(http.MethodDelete, DatabaseAPI+"/db/delete/all", nil)
 	eraseResponse, eraseErr := client.Do(eraseRequest)
 
-	if eraseErr == nil && eraseResponse.StatusCode == http.StatusAccepted {
+	if eraseErr == nil && eraseResponse.StatusCode == http.StatusOK {
 		w.WriteHeader(http.StatusOK)
 	} else if eraseErr != nil {
 		log.Printf("[ERROR] Error in call to db/delete/all: %v", eraseErr.Error())

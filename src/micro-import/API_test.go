@@ -47,7 +47,7 @@ func MockDatabaseMicroservice() *httptest.Server {
 	mockedServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/db/delete/all" {
-				w.WriteHeader(http.StatusAccepted)
+				w.WriteHeader(http.StatusOK)
 			} else if r.URL.Path == "/db/insert" {
 				body, _ := ioutil.ReadAll(r.Body)
 
