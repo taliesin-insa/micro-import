@@ -113,7 +113,6 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 		extension := filepath.Ext(formFileHeader.Filename)
 		path := VolumePath+strconv.FormatInt(nsec, 10)+"_"+PodName+extension
-		fmt.Println(path)
 
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
