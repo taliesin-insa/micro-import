@@ -66,12 +66,40 @@ type DBEntry struct {
 	Annotator string `json:"Annotator"`
 }
 
+func RemoveContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 
 func home(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "you're talking to the import microservice")
 }
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
+
+	removeFilesErr := RemoveContents(VolumePath)
+
+	if removeFilesErr != nil {
+		log.Printf("[ERROR] Error erasing existing snippets on the shared folder: %v", removeFilesErr.Error())
+		fmt.Fprint(w ,"[MICRO-IMPORT] Error while cleaning up existing snippets")
+		return
+	}
 
 	// FIXME : for v0 we erase previous data in db, needs to be changed later
 	client := &http.Client{}
@@ -83,12 +111,14 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	} else if eraseErr != nil {
 		log.Printf("[ERROR] Error in call to db/delete/all: %v", eraseErr.Error())
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to database")
+		return
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
 		eraseResponseBody, _ := ioutil.ReadAll(eraseResponse.Body)
 		log.Printf("[ERROR] Error in response from db/delete/all: %v", string(eraseResponseBody))
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error in response from database")
+		return
 	}
 
 }
