@@ -231,6 +231,37 @@ func TestUploadImageInvalidMultipartForm(t *testing.T) {
 	}
 }
 
+func TestUploadImageTooLargeImageSize(t *testing.T) {
+	body := new(bytes.Buffer)
+
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "sample.png")
+	part.Write(make([]byte, 32 << 22))
+
+	writer.Close()
+	formBody := ioutil.NopCloser(body)
+	formContentType := writer.FormDataContentType()
+
+	request := &http.Request{
+		Method: http.MethodPost,
+		Body: formBody,
+		Header: map[string][]string{
+			"Content-Type": {formContentType},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+
+	uploadImage(recorder, request)
+
+	fmt.Println(recorder.Body)
+	if status := recorder.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+		return
+	}
+}
+
 func TestUploadImageInvalidImageExtension(t *testing.T) {
 	formBody, formContentType := generateInvalidMultipartForm("file")
 	request := &http.Request{
@@ -251,6 +282,7 @@ func TestUploadImageInvalidImageExtension(t *testing.T) {
 		return
 	}
 }
+
 
 func TestUploadImageMultipartForm(t *testing.T) {
 	VolumePath, _ = ioutil.TempDir("", "")

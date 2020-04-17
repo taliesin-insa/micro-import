@@ -94,7 +94,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
-	parseError := r.ParseMultipartForm(MaxImageSize)
+	parseError := r.ParseMultipartForm(32 << 20)
 
 	if parseError != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -118,6 +118,15 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		io.Copy(buf, formFile)
 
 		contentType := http.DetectContentType(buf.Bytes())
+
+		bufSize := buf.Len()
+
+		if bufSize > MaxImageSize {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w ,"[MICRO-IMPORT] Image too large (> %v bytes)", MaxImageSize)
+			return
+		}
+
 
 		if contentType != "image/png" && contentType != "image/jpeg" {
 			w.WriteHeader(http.StatusBadRequest)
