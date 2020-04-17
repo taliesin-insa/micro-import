@@ -114,10 +114,21 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		extension := filepath.Ext(formFileHeader.Filename)
 		path := VolumePath+strconv.FormatInt(nsec, 10)+"_"+PodName+extension
 
+		buf := bytes.NewBuffer(nil)
+		io.Copy(buf, formFile)
+
+		contentType := http.DetectContentType(buf.Bytes())
+
+		if contentType != "image/png" && contentType != "image/jpeg" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w ,"[MICRO-IMPORT] Unsupported file type")
+			return
+		}
+
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
 		if fileErr == nil {
-			io.Copy(file, formFile)
+			io.Copy(file, buf)
 			file.Close() // closing file now so it can be read by conversion
 
 			piffReq := PiFFRequest{Path:path}
