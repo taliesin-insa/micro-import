@@ -96,6 +96,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	removeFilesErr := RemoveContents(VolumePath)
 
 	if removeFilesErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("[ERROR] Error erasing existing snippets on the shared folder: %v", removeFilesErr.Error())
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error while cleaning up existing snippets")
 		return
@@ -109,6 +110,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusOK {
 		w.WriteHeader(http.StatusOK)
 	} else if eraseErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("[ERROR] Error in call to db/delete/all: %v", eraseErr.Error())
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to database")
 		return
