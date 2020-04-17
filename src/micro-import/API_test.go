@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -72,6 +73,26 @@ func MockDatabaseMicroservice() *httptest.Server {
 	return mockedServer
 }
 
+
+func TestMain(m *testing.M) {
+	/* Mocking the shared folder */
+	dir, createFolderErr := ioutil.TempDir("", "snippets")
+	if createFolderErr != nil {
+		panic("failed to create temp directory")
+	}
+
+	VolumePath = dir+"/"
+
+	code := m.Run()
+
+	removeErr := os.RemoveAll(VolumePath)
+	if removeErr != nil {
+		panic("failed to remove temp directory")
+	}
+
+	os.Exit(code)
+}
+
 func MockConversionMicroservice() *httptest.Server {
 
 	mockedServer := httptest.NewServer(
@@ -88,6 +109,16 @@ func MockConversionMicroservice() *httptest.Server {
 
 
 func TestCreateDatabaseOK(t *testing.T) {
+
+	/* Create some placeholder files in the shared folder */
+	for i := 0; i < 5; i++ {
+		file, createFileErr := ioutil.TempFile(VolumePath, strconv.Itoa(i))
+		if createFileErr != nil {
+			panic("could not create temp file")
+		}
+
+		file.Write([]byte(strconv.Itoa(i)));
+	}
 
 	/* Mocking Database API Response */
 	mockedDBServer := MockDatabaseMicroservice()
@@ -108,10 +139,34 @@ func TestCreateDatabaseOK(t *testing.T) {
 			status, http.StatusOK)
 	}
 
+	files, _ := ioutil.ReadDir(VolumePath)
+
+	if len(files) > 0 {
+		t.Errorf("createDatabase did not clear snippets folder, got %v files in folder, want 0.", len(files))
+	}
+
 	mockedDBServer.Close()
 }
 
-// FIXME : at the moment the calls made in createDatabase won't ever return an error
+func TestCreateDatabaseErrorErasingSnippets(t *testing.T) {
+	request := &http.Request{
+		Method: http.MethodPost,
+	}
+	recorder := httptest.NewRecorder()
+
+	saveVolume := VolumePath
+	VolumePath = "/invalid/folder"
+
+	createDatabase(recorder, request)
+
+	if status := recorder.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusInternalServerError)
+	}
+
+	VolumePath = saveVolume
+}
+
 func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 
 	ts := httptest.NewServer(
@@ -191,8 +246,6 @@ func TestUploadImageInvalidMultipartForm(t *testing.T) {
 }
 
 func TestUploadImageMultipartForm(t *testing.T) {
-	VolumePath, _ = ioutil.TempDir("", "")
-	VolumePath+="/"
 
 	PodName = "podname"
 
