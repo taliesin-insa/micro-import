@@ -84,7 +84,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 
 	if user.Role != lib_auth.RoleAdmin {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("[MICRO IMPORT] Insufficient permissions to create database"))
+		w.Write([]byte("[AUTH] Insufficient permissions to create database"))
 	}
 
 	// FIXME : for v0 we erase previous data in db, needs to be changed later
@@ -108,6 +108,19 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
+	user, authErr, authStatusCode := lib_auth.AuthenticateUser(r)
+
+	if authErr != nil {
+		w.WriteHeader(authStatusCode)
+		w.Write([]byte("[AUTH] "+authErr.Error()))
+		return
+	}
+
+	if user.Role != lib_auth.RoleAdmin {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("[AUTH] Insufficient permissions to upload snippets"))
+	}
+
 	parseError := r.ParseMultipartForm(32 << 20)
 
 	if parseError != nil {
