@@ -52,7 +52,7 @@ func MockAuthMicroservice() *httptest.Server {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/auth/verifyToken" {
 				w.WriteHeader(http.StatusOK)
-				r, _ := json.Marshal(lib_auth.UserData{Username:"morpheus", Role:"0"})
+				r, _ := json.Marshal(lib_auth.UserData{Username:"morpheus", Role:lib_auth.RoleAdmin})
 				w.Write(r)
 			}
 		}))

@@ -78,11 +78,11 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 
 	if authErr != nil {
 		w.WriteHeader(authStatusCode)
-		w.Write([]byte(authErr.Error()))
+		w.Write([]byte("[AUTH] "+authErr.Error()))
 		return
 	}
 
-	if user.Role != "0" {
+	if user.Role != lib_auth.RoleAdmin {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("[MICRO IMPORT] Insufficient permissions to create database"))
 	}
