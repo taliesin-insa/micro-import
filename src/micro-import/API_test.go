@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -137,6 +140,7 @@ func TestCreateDatabaseOK(t *testing.T) {
 	if status := recorder.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
+		return
 	}
 
 	files, _ := ioutil.ReadDir(VolumePath)
@@ -146,6 +150,22 @@ func TestCreateDatabaseOK(t *testing.T) {
 	}
 
 	mockedDBServer.Close()
+}
+
+func createImage(width int, height int) *image.RGBA {
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{X: width, Y: height}
+
+	img := image.NewRGBA(image.Rectangle{Min: upLeft, Max: lowRight})
+
+	// set color for each pixel
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			img.Set(x, y, color.White)
+		}
+	}
+
+	return img
 }
 
 func TestCreateDatabaseErrorErasingSnippets(t *testing.T) {
@@ -191,6 +211,7 @@ func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 	if status := recorder.Code; status != http.StatusInternalServerError {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusInternalServerError)
+		return
 	}
 
 }
@@ -207,16 +228,34 @@ func TestUploadImageNoMultipartForm(t *testing.T) {
 	if status := recorder.Code; status != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusBadRequest)
+		return
 	}
 
 	if message := string(recorder.Body.Bytes()) ; message != "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)" {
 		t.Errorf("handler returned wrong response body: got %v want %v",
 			message, "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)")
+		return
 	}
 
 }
 
 func generateMultipartForm(paramName string) (io.ReadCloser, string) {
+	imageContent := new(bytes.Buffer)
+	body := new(bytes.Buffer)
+
+	pngEncodeErr := png.Encode(imageContent, createImage(200,200))
+	if pngEncodeErr != nil {
+		panic("could not generate multipart form")
+	}
+
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile(paramName, "sample.png")
+	part.Write(imageContent.Bytes())
+	writer.Close()
+	return ioutil.NopCloser(body), writer.FormDataContentType()
+}
+
+func generateInvalidMultipartForm(paramName string) (io.ReadCloser, string) {
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 	part, _ := writer.CreateFormFile(paramName, "sample.txt")
@@ -224,6 +263,7 @@ func generateMultipartForm(paramName string) (io.ReadCloser, string) {
 	writer.Close()
 	return ioutil.NopCloser(body), writer.FormDataContentType()
 }
+
 
 func TestUploadImageInvalidMultipartForm(t *testing.T) {
 	formBody, formContentType := generateMultipartForm("notfile")
@@ -242,8 +282,62 @@ func TestUploadImageInvalidMultipartForm(t *testing.T) {
 	if status := recorder.Code; status != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusBadRequest)
+		return
 	}
 }
+
+func TestUploadImageTooLargeImageSize(t *testing.T) {
+	body := new(bytes.Buffer)
+
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "sample.png")
+	part.Write(make([]byte, 32 << 22))
+
+	writer.Close()
+	formBody := ioutil.NopCloser(body)
+	formContentType := writer.FormDataContentType()
+
+	request := &http.Request{
+		Method: http.MethodPost,
+		Body: formBody,
+		Header: map[string][]string{
+			"Content-Type": {formContentType},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+
+	uploadImage(recorder, request)
+
+	fmt.Println(recorder.Body)
+	if status := recorder.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+		return
+	}
+}
+
+func TestUploadImageInvalidImageExtension(t *testing.T) {
+	formBody, formContentType := generateInvalidMultipartForm("file")
+	request := &http.Request{
+		Method: http.MethodPost,
+		Body: formBody,
+		Header: map[string][]string{
+			"Content-Type": {formContentType},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+
+	uploadImage(recorder, request)
+
+	if status := recorder.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+		return
+	}
+}
+
 
 func TestUploadImageMultipartForm(t *testing.T) {
 
@@ -271,14 +365,17 @@ func TestUploadImageMultipartForm(t *testing.T) {
 	if status := recorder.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
+		return
 	}
 
 	if _, err := os.Stat(InsertedPath); err != nil {
 		t.Error("file was not saved to volume")
+		return
 	}
 
-	if InsertedRealFilename != "sample.txt" {
+	if InsertedRealFilename != "sample.png" {
 		t.Errorf("the name of the file before renaming was not correctly saved, got %v want %v", InsertedRealFilename, "sample.txt")
+		return
 	}
 
 	os.RemoveAll(VolumePath)
