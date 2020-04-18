@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/taliesin-insa/lib-auth"
 	"io"
 	"io/ioutil"
 	"log"
@@ -73,6 +74,19 @@ func home(w http.ResponseWriter, r *http.Request) {
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
 
+	user, authErr, authStatusCode := lib_auth.AuthenticateUser(r)
+
+	if authErr != nil {
+		w.WriteHeader(authStatusCode)
+		w.Write([]byte(authErr.Error()))
+		return
+	}
+
+	if user.Role != "0" {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("[MICRO IMPORT] Insufficient permissions to create database"))
+	}
+
 	// FIXME : for v0 we erase previous data in db, needs to be changed later
 	client := &http.Client{}
 	eraseRequest, _ := http.NewRequest(http.MethodDelete, DatabaseAPI+"/db/delete/all", nil)
@@ -94,7 +108,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
-	parseError := r.ParseMultipartForm(MaxImageSize)
+	parseError := r.ParseMultipartForm(32 << 20)
 
 	if parseError != nil {
 		w.WriteHeader(http.StatusBadRequest)

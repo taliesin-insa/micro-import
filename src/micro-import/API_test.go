@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	lib_auth "github.com/taliesin-insa/lib-auth"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -44,6 +45,20 @@ var EmptyPiFF = PiFFStruct{
 
 var InsertedPath string
 var InsertedRealFilename string
+
+func MockAuthMicroservice() *httptest.Server {
+
+	mockedServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/auth/verifyToken" {
+				w.WriteHeader(http.StatusOK)
+				r, _ := json.Marshal(lib_auth.UserData{Username:"morpheus", Role:"0"})
+				w.Write(r)
+			}
+		}))
+
+	return mockedServer
+}
 
 func MockDatabaseMicroservice() *httptest.Server {
 
@@ -86,6 +101,17 @@ func MockConversionMicroservice() *httptest.Server {
 	return mockedServer
 }
 
+func TestMain(m *testing.M) {
+	mockedAuthServer := MockAuthMicroservice()
+
+	previousAuthUrl := os.Getenv("AUTH_API_URL")
+	os.Setenv("AUTH_API_URL", mockedAuthServer.URL)
+
+	m.Run()
+
+	os.Setenv("AUTH_API_URL", previousAuthUrl)
+}
+
 
 func TestCreateDatabaseOK(t *testing.T) {
 
@@ -106,6 +132,7 @@ func TestCreateDatabaseOK(t *testing.T) {
 	if status := recorder.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
+		return
 	}
 
 	mockedDBServer.Close()
@@ -136,6 +163,7 @@ func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 	if status := recorder.Code; status != http.StatusInternalServerError {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusInternalServerError)
+		return
 	}
 
 }
@@ -152,11 +180,13 @@ func TestUploadImageNoMultipartForm(t *testing.T) {
 	if status := recorder.Code; status != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusBadRequest)
+		return
 	}
 
 	if message := string(recorder.Body.Bytes()) ; message != "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)" {
 		t.Errorf("handler returned wrong response body: got %v want %v",
 			message, "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)")
+		return
 	}
 
 }
@@ -169,6 +199,7 @@ func generateMultipartForm(paramName string) (io.ReadCloser, string) {
 	writer.Close()
 	return ioutil.NopCloser(body), writer.FormDataContentType()
 }
+
 
 func TestUploadImageInvalidMultipartForm(t *testing.T) {
 	formBody, formContentType := generateMultipartForm("notfile")
@@ -218,14 +249,17 @@ func TestUploadImageMultipartForm(t *testing.T) {
 	if status := recorder.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
+		return
 	}
 
 	if _, err := os.Stat(InsertedPath); err != nil {
 		t.Error("file was not saved to volume")
+		return
 	}
 
 	if InsertedRealFilename != "sample.txt" {
 		t.Errorf("the name of the file before renaming was not correctly saved, got %v want %v", InsertedRealFilename, "sample.txt")
+		return
 	}
 
 	os.RemoveAll(VolumePath)
