@@ -126,7 +126,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
-	parseError := r.ParseMultipartForm(MaxImageSize)
+	parseError := r.ParseMultipartForm(32 << 20)
 
 	if parseError != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -146,10 +146,30 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		extension := filepath.Ext(formFileHeader.Filename)
 		path := VolumePath+strconv.FormatInt(nsec, 10)+"_"+PodName+extension
 
+		buf := bytes.NewBuffer(nil)
+		io.Copy(buf, formFile)
+
+		contentType := http.DetectContentType(buf.Bytes())
+
+		bufSize := buf.Len()
+
+		if bufSize > MaxImageSize {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w ,"[MICRO-IMPORT] Image too large (> %v bytes)", MaxImageSize)
+			return
+		}
+
+
+		if contentType != "image/png" && contentType != "image/jpeg" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w ,"[MICRO-IMPORT] Unsupported file type")
+			return
+		}
+
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
 		if fileErr == nil {
-			io.Copy(file, formFile)
+			io.Copy(file, buf)
 			file.Close() // closing file now so it can be read by conversion
 
 			piffReq := PiFFRequest{Path:path}
