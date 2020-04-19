@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	lib_auth "github.com/taliesin-insa/lib-auth"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -12,6 +15,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -87,6 +91,32 @@ func MockDatabaseMicroservice() *httptest.Server {
 	return mockedServer
 }
 
+
+func TestMain(m *testing.M) {
+	mockedAuthServer := MockAuthMicroservice()
+
+	previousAuthUrl := os.Getenv("AUTH_API_URL")
+	os.Setenv("AUTH_API_URL", mockedAuthServer.URL)
+
+	/* Mocking the shared folder */
+	dir, createFolderErr := ioutil.TempDir("", "snippets")
+	if createFolderErr != nil {
+		panic("failed to create temp directory")
+	}
+
+	VolumePath = dir+"/"
+
+	code := m.Run()
+
+	removeErr := os.RemoveAll(VolumePath)
+	if removeErr != nil {
+		panic("failed to remove temp directory")
+	}
+
+	os.Setenv("AUTH_API_URL", previousAuthUrl)
+	os.Exit(code)
+}
+
 func MockConversionMicroservice() *httptest.Server {
 
 	mockedServer := httptest.NewServer(
@@ -101,19 +131,18 @@ func MockConversionMicroservice() *httptest.Server {
 	return mockedServer
 }
 
-func TestMain(m *testing.M) {
-	mockedAuthServer := MockAuthMicroservice()
-
-	previousAuthUrl := os.Getenv("AUTH_API_URL")
-	os.Setenv("AUTH_API_URL", mockedAuthServer.URL)
-
-	m.Run()
-
-	os.Setenv("AUTH_API_URL", previousAuthUrl)
-}
-
 
 func TestCreateDatabaseOK(t *testing.T) {
+
+	/* Create some placeholder files in the shared folder */
+	for i := 0; i < 5; i++ {
+		file, createFileErr := ioutil.TempFile(VolumePath, strconv.Itoa(i))
+		if createFileErr != nil {
+			panic("could not create temp file")
+		}
+
+		file.Write([]byte(strconv.Itoa(i)));
+	}
 
 	/* Mocking Database API Response */
 	mockedDBServer := MockDatabaseMicroservice()
@@ -135,10 +164,50 @@ func TestCreateDatabaseOK(t *testing.T) {
 		return
 	}
 
+	files, _ := ioutil.ReadDir(VolumePath)
+
+	if len(files) > 0 {
+		t.Errorf("createDatabase did not clear snippets folder, got %v files in folder, want 0.", len(files))
+	}
+
 	mockedDBServer.Close()
 }
 
-// FIXME : at the moment the calls made in createDatabase won't ever return an error
+func createImage(width int, height int) *image.RGBA {
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{X: width, Y: height}
+
+	img := image.NewRGBA(image.Rectangle{Min: upLeft, Max: lowRight})
+
+	// set color for each pixel
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			img.Set(x, y, color.White)
+		}
+	}
+
+	return img
+}
+
+func TestCreateDatabaseErrorErasingSnippets(t *testing.T) {
+	request := &http.Request{
+		Method: http.MethodPost,
+	}
+	recorder := httptest.NewRecorder()
+
+	saveVolume := VolumePath
+	VolumePath = "/invalid/folder"
+
+	createDatabase(recorder, request)
+
+	if status := recorder.Code; status != http.StatusInternalServerError {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusInternalServerError)
+	}
+
+	VolumePath = saveVolume
+}
+
 func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 
 	ts := httptest.NewServer(
@@ -192,6 +261,22 @@ func TestUploadImageNoMultipartForm(t *testing.T) {
 }
 
 func generateMultipartForm(paramName string) (io.ReadCloser, string) {
+	imageContent := new(bytes.Buffer)
+	body := new(bytes.Buffer)
+
+	pngEncodeErr := png.Encode(imageContent, createImage(200,200))
+	if pngEncodeErr != nil {
+		panic("could not generate multipart form")
+	}
+
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile(paramName, "sample.png")
+	part.Write(imageContent.Bytes())
+	writer.Close()
+	return ioutil.NopCloser(body), writer.FormDataContentType()
+}
+
+func generateInvalidMultipartForm(paramName string) (io.ReadCloser, string) {
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 	part, _ := writer.CreateFormFile(paramName, "sample.txt")
@@ -218,12 +303,64 @@ func TestUploadImageInvalidMultipartForm(t *testing.T) {
 	if status := recorder.Code; status != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusBadRequest)
+		return
 	}
 }
 
+func TestUploadImageTooLargeImageSize(t *testing.T) {
+	body := new(bytes.Buffer)
+
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "sample.png")
+	part.Write(make([]byte, 32 << 22))
+
+	writer.Close()
+	formBody := ioutil.NopCloser(body)
+	formContentType := writer.FormDataContentType()
+
+	request := &http.Request{
+		Method: http.MethodPost,
+		Body: formBody,
+		Header: map[string][]string{
+			"Content-Type": {formContentType},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+
+	uploadImage(recorder, request)
+
+	fmt.Println(recorder.Body)
+	if status := recorder.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+		return
+	}
+}
+
+func TestUploadImageInvalidImageExtension(t *testing.T) {
+	formBody, formContentType := generateInvalidMultipartForm("file")
+	request := &http.Request{
+		Method: http.MethodPost,
+		Body: formBody,
+		Header: map[string][]string{
+			"Content-Type": {formContentType},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+
+	uploadImage(recorder, request)
+
+	if status := recorder.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+		return
+	}
+}
+
+
 func TestUploadImageMultipartForm(t *testing.T) {
-	VolumePath, _ = ioutil.TempDir("", "")
-	VolumePath+="/"
 
 	PodName = "podname"
 
@@ -257,7 +394,7 @@ func TestUploadImageMultipartForm(t *testing.T) {
 		return
 	}
 
-	if InsertedRealFilename != "sample.txt" {
+	if InsertedRealFilename != "sample.png" {
 		t.Errorf("the name of the file before renaming was not correctly saved, got %v want %v", InsertedRealFilename, "sample.txt")
 		return
 	}

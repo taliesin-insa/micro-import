@@ -67,6 +67,26 @@ type DBEntry struct {
 	Annotator string `json:"Annotator"`
 }
 
+func RemoveContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 
 func home(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "you're talking to the import microservice")
@@ -87,7 +107,15 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("[AUTH] Insufficient permissions to create database"))
 	}
 
-	// FIXME : for v0 we erase previous data in db, needs to be changed later
+	removeFilesErr := RemoveContents(VolumePath)
+
+	if removeFilesErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("[ERROR] Error erasing existing snippets on the shared folder: %v", removeFilesErr.Error())
+		fmt.Fprint(w ,"[MICRO-IMPORT] Error while cleaning up existing snippets")
+		return
+	}
+
 	client := &http.Client{}
 	eraseRequest, _ := http.NewRequest(http.MethodDelete, DatabaseAPI+"/db/delete/all", nil)
 	eraseResponse, eraseErr := client.Do(eraseRequest)
@@ -95,19 +123,23 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusOK {
 		w.WriteHeader(http.StatusOK)
 	} else if eraseErr != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("[ERROR] Error in call to db/delete/all: %v", eraseErr.Error())
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error in request to database")
+		return
 	} else {
 		w.WriteHeader(http.StatusInternalServerError)
 		// error returned by db api
 		eraseResponseBody, _ := ioutil.ReadAll(eraseResponse.Body)
 		log.Printf("[ERROR] Error in response from db/delete/all: %v", string(eraseResponseBody))
 		fmt.Fprint(w ,"[MICRO-IMPORT] Error in response from database")
+		return
 	}
 
 }
 
 func uploadImage(w http.ResponseWriter, r *http.Request) {
+
 	user, authErr, authStatusCode := lib_auth.AuthenticateUser(r)
 
 	if authErr != nil {
@@ -141,10 +173,30 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		extension := filepath.Ext(formFileHeader.Filename)
 		path := VolumePath+strconv.FormatInt(nsec, 10)+"_"+PodName+extension
 
+		buf := bytes.NewBuffer(nil)
+		io.Copy(buf, formFile)
+
+		contentType := http.DetectContentType(buf.Bytes())
+
+		bufSize := buf.Len()
+
+		if bufSize > MaxImageSize {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w ,"[MICRO-IMPORT] Image too large (> %v bytes)", MaxImageSize)
+			return
+		}
+
+
+		if contentType != "image/png" && contentType != "image/jpeg" {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w ,"[MICRO-IMPORT] Unsupported file type")
+			return
+		}
+
 		file, fileErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
 
 		if fileErr == nil {
-			io.Copy(file, formFile)
+			io.Copy(file, buf)
 			file.Close() // closing file now so it can be read by conversion
 
 			piffReq := PiFFRequest{Path:path}
