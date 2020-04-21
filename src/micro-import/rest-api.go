@@ -105,6 +105,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 	if user.Role != lib_auth.RoleAdmin {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("[AUTH] Insufficient permissions to create database"))
+		return
 	}
 
 	removeFilesErr := RemoveContents(VolumePath)
@@ -151,6 +152,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 	if user.Role != lib_auth.RoleAdmin {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte("[AUTH] Insufficient permissions to upload snippets"))
+		return
 	}
 
 	parseError := r.ParseMultipartForm(32 << 20)
