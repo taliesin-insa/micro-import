@@ -21,8 +21,8 @@ import (
 
 
 var (
-	http_requests_total = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "http_requests_total",
+	http_requests_total_import = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "http_requests_total_import",
 		Help: "The total number of processed events",
 	})
 	)
@@ -104,6 +104,7 @@ func home(w http.ResponseWriter, r *http.Request) {
 }
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
+	http_requests_total_import.Inc()
 
 	user, authErr, authStatusCode := lib_auth.AuthenticateUser(r)
 
@@ -166,6 +167,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("[AUTH] Insufficient permissions to upload snippets"))
 		return
 	}
+
+	http_requests_total_import.Inc()
 
 	parseError := r.ParseMultipartForm(32 << 20)
 
@@ -300,7 +303,6 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 
 func prometheusMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http_requests_total.Inc()
 		next.ServeHTTP(w, r)
 	})
 }
