@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/taliesin-insa/lib-auth"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -15,6 +18,14 @@ import (
 	"strconv"
 	"time"
 )
+
+
+var (
+	http_requests_total = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "http_requests_total",
+		Help: "The total number of processed events",
+	})
+	)
 
 const MaxImageSize = 32 << 20
 var VolumePath = "/snippets/"
@@ -287,6 +298,13 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func prometheusMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http_requests_total.Inc()
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	dbEnvVal, dbEnvExists := os.LookupEnv("DATABASE_API_URL")
 	convertEnvVal, convertEnvExists := os.LookupEnv("CONVERSION_API_URL")
@@ -312,8 +330,11 @@ func main() {
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/import/", home)
 
+	router.Use(prometheusMiddleware)
+	router.Path("/metrics").Handler(promhttp.Handler())
+
+	router.HandleFunc("/import/", home)
 	router.HandleFunc("/import/createDB", createDatabase).Methods("POST")
 	router.HandleFunc("/import/upload", uploadImage).Methods("POST")
 
