@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	lib_auth "github.com/taliesin-insa/lib-auth"
 	"image"
 	"image/color"
 	"image/png"
@@ -46,8 +47,37 @@ var EmptyPiFF = PiFFStruct{
 	Parent:   0,
 }
 
+type VerifyRequest struct {
+	Token	string
+}
+
 var InsertedPath string
 var InsertedRealFilename string
+
+func MockAuthMicroservice() *httptest.Server {
+
+	mockedServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/auth/verifyToken" {
+				body, _ := ioutil.ReadAll(r.Body)
+
+				var data VerifyRequest
+				json.Unmarshal(body, &data)
+
+				if data.Token == "chevreuil" {
+					w.WriteHeader(http.StatusOK)
+					r, _ := json.Marshal(lib_auth.UserData{Username:"morpheus", Role:lib_auth.RoleAdmin})
+					w.Write(r)
+					return
+				} else {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+			}
+		}))
+
+	return mockedServer
+}
 
 func MockDatabaseMicroservice() *httptest.Server {
 
@@ -78,6 +108,11 @@ func MockDatabaseMicroservice() *httptest.Server {
 
 
 func TestMain(m *testing.M) {
+	mockedAuthServer := MockAuthMicroservice()
+
+	previousAuthUrl := os.Getenv("AUTH_API_URL")
+	os.Setenv("AUTH_API_URL", mockedAuthServer.URL)
+
 	/* Mocking the shared folder */
 	dir, createFolderErr := ioutil.TempDir("", "snippets")
 	if createFolderErr != nil {
@@ -93,7 +128,27 @@ func TestMain(m *testing.M) {
 		panic("failed to remove temp directory")
 	}
 
+	os.Setenv("AUTH_API_URL", previousAuthUrl)
 	os.Exit(code)
+}
+
+func TestUploadImageBadAuth(t *testing.T) {
+	wrongAuthRequest := &http.Request{
+		Method: http.MethodPost,
+		Header: map[string][]string{
+			"Authorization": {"matrix"},
+		},
+	}
+
+	// make http request
+	wrongAuthRecorder := httptest.NewRecorder()
+	createDatabase(wrongAuthRecorder, wrongAuthRequest)
+
+	// status test
+	if status := wrongAuthRecorder.Code; status != http.StatusBadRequest {
+		t.Errorf("[TEST_ERROR] Handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
 }
 
 func MockConversionMicroservice() *httptest.Server {
@@ -129,6 +184,9 @@ func TestCreateDatabaseOK(t *testing.T) {
 	/* Mock http request, here in createDatabase we don't use the request struct so we can pass a blank one */
 	request := &http.Request{
 		Method: http.MethodPost,
+		Header: map[string][]string{
+			"Authorization": {"chevreuil"},
+		},
 	}
 
 	/* Recorder object that saves the http feedback from the createDatabase function */
@@ -171,6 +229,9 @@ func createImage(width int, height int) *image.RGBA {
 func TestCreateDatabaseErrorErasingSnippets(t *testing.T) {
 	request := &http.Request{
 		Method: http.MethodPost,
+		Header: map[string][]string{
+			"Authorization": {"chevreuil"},
+		},
 	}
 	recorder := httptest.NewRecorder()
 
@@ -202,6 +263,9 @@ func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 
 	request := &http.Request{
 		Method: http.MethodPost,
+		Header: map[string][]string{
+			"Authorization": {"chevreuil"},
+		},
 	}
 	recorder := httptest.NewRecorder()
 
@@ -219,6 +283,9 @@ func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 func TestUploadImageNoMultipartForm(t *testing.T) {
 	request := &http.Request{
 		Method: http.MethodPost,
+		Header: map[string][]string{
+			"Authorization": {"chevreuil"},
+		},
 		Body: nil,
 	}
 	recorder := httptest.NewRecorder()
@@ -272,6 +339,7 @@ func TestUploadImageInvalidMultipartForm(t *testing.T) {
 		Body: formBody,
 		Header: map[string][]string{
 			"Content-Type": {formContentType},
+			"Authorization": {"chevreuil"},
 		},
 	}
 
@@ -302,6 +370,7 @@ func TestUploadImageTooLargeImageSize(t *testing.T) {
 		Body: formBody,
 		Header: map[string][]string{
 			"Content-Type": {formContentType},
+			"Authorization": {"chevreuil"},
 		},
 	}
 
@@ -324,6 +393,7 @@ func TestUploadImageInvalidImageExtension(t *testing.T) {
 		Body: formBody,
 		Header: map[string][]string{
 			"Content-Type": {formContentType},
+			"Authorization": {"chevreuil"},
 		},
 	}
 
@@ -355,6 +425,7 @@ func TestUploadImageMultipartForm(t *testing.T) {
 		Body: formBody,
 		Header: map[string][]string{
 			"Content-Type": {formContentType},
+			"Authorization": {"chevreuil"},
 		},
 	}
 
