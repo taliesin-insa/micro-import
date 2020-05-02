@@ -119,6 +119,7 @@ func createDatabase(w http.ResponseWriter, r *http.Request) {
 
 	client := &http.Client{}
 	eraseRequest, _ := http.NewRequest(http.MethodDelete, DatabaseAPI+"/db/delete/all", nil)
+	eraseRequest.Header.Add("Authorization", r.Header.Get("Authorization"))
 	eraseResponse, eraseErr := client.Do(eraseRequest)
 
 	if eraseErr == nil && eraseResponse.StatusCode == http.StatusOK {
@@ -241,7 +242,13 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 			dbListOfEntries := [1]DBEntry{dbEntry}
 			mDbEntry, _ := json.Marshal(dbListOfEntries)
 
-			dbInsertRes, dbInsertErr := http.Post(DatabaseAPI+"/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
+			client := &http.Client{}
+
+			//dbInsertRes, dbInsertErr := http.Post(DatabaseAPI+"/db/insert", "application/json", bytes.NewBuffer(mDbEntry))
+			dbInsertReq, _ := http.NewRequest("POST", DatabaseAPI+"/db/insert", bytes.NewBuffer(mDbEntry))
+			dbInsertReq.Header.Add("Authorization", r.Header.Get("Authorization"))
+
+			dbInsertRes, dbInsertErr := client.Do(dbInsertReq)
 
 			if dbInsertErr == nil && dbInsertRes.StatusCode == http.StatusCreated {
 				_, dbReadErr := ioutil.ReadAll(dbInsertRes.Body)
