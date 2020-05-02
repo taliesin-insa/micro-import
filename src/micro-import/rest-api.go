@@ -100,6 +100,7 @@ func RemoveContents(dir string) error {
 
 
 func home(w http.ResponseWriter, r *http.Request) {
+	http_requests_total_import.Inc()
 	fmt.Fprint(w, "you're talking to the import microservice")
 }
 
