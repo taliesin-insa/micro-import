@@ -44,6 +44,7 @@ dev:
     - kubectl config use-context default
     - kubectl apply -f deployment.yml
     - kubectl apply -f service.yml
+    - kubectl apply -f hpa.yml
     - kubectl set image deployment/import-dev import-dev=${CONTAINER_IMAGE_SHA} --record -n gitlab-managed-apps
 
 production:
