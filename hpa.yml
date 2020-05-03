@@ -1,7 +1,7 @@
-apiVersion: autoscaling/v2beta1
+apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: import-dev
+  name: import-dev-custom
   namespace: gitlab-managed-apps
 spec:
   maxReplicas: 10
@@ -14,8 +14,13 @@ spec:
   - type: Resource
     resource:
       name: cpu
-      targetAverageUtilization: 25
+      target:
+        type: Utilization
+        averageUtilization: 50
   - type: Pods
     pods:
-      metricName: http_requests_total_import
-      targetAverageValue: 1
+      metric:
+        name: http_requests_total_import
+      target:
+        type: AverageValue
+        averageValue: 1
