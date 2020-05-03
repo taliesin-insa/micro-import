@@ -37,6 +37,9 @@ spec:
               value: "http://database-api.gitlab-managed-apps.svc.cluster.local:8080"
             - name: CONVERSION_API_URL
               value: "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
+          resources:
+            requests:
+              cpu: "250m"
       volumes:
         - name: file-server
           persistentVolumeClaim:
@@ -82,6 +85,9 @@ spec:
               value: "http://database-dev-api.gitlab-managed-apps.svc.cluster.local:8080"
             - name: CONVERSION_API_URL
               value: "http://conversion-dev-api.gitlab-managed-apps.svc.cluster.local:12345"
+          resources:
+            requests:
+              cpu: "250m"
       volumes:
         - name: file-server-dev
           persistentVolumeClaim:
