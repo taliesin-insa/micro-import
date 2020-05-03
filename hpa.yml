@@ -16,11 +16,11 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 10
+        averageUtilization: 20
   - type: Pods
     pods:
       metric:
-        name: http_requests_total_import
+        name: http_requests_total_import_per_second
       target:
         type: AverageValue
-        averageValue: 5m
+        averageValue: 10m
