@@ -20,7 +20,7 @@ spec:
   - type: Pods
     pods:
       metric:
-        name: http_requests_total_import_per_second
+        name: http_requests_per_second
       target:
         type: AverageValue
-        averageValue: 10m
+        averageValue: 50m

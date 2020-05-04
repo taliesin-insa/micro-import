@@ -21,11 +21,11 @@ import (
 
 
 var (
-	http_requests_total_import = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "http_requests_total_import",
-		Help: "The total number of processed events",
+	httpRequestsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "http_requests_total",
+		Help: "Number of HTTP requests processed by the microservice",
 	})
-	)
+)
 
 const MaxImageSize = 32 << 20
 var VolumePath = "/snippets/"
@@ -100,12 +100,12 @@ func RemoveContents(dir string) error {
 
 
 func home(w http.ResponseWriter, r *http.Request) {
-	http_requests_total_import.Inc()
+	httpRequestsTotal.Inc()
 	fmt.Fprint(w, "you're talking to the import microservice")
 }
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
-	http_requests_total_import.Inc()
+	httpRequestsTotal.Inc()
 
 	user, authErr, authStatusCode := lib_auth.AuthenticateUser(r)
 
@@ -169,7 +169,7 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http_requests_total_import.Inc()
+	httpRequestsTotal.Inc()
 
 	parseError := r.ParseMultipartForm(32 << 20)
 
