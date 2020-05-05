@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/taliesin-insa/lib-auth"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +17,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+)
+
+
+var (
+	httpRequestsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "http_requests_total",
+		Help: "Number of HTTP requests processed by the microservice",
+	})
 )
 
 const MaxImageSize = 32 << 20
@@ -89,10 +100,12 @@ func RemoveContents(dir string) error {
 
 
 func home(w http.ResponseWriter, r *http.Request) {
+	httpRequestsTotal.Inc()
 	fmt.Fprint(w, "you're talking to the import microservice")
 }
 
 func createDatabase(w http.ResponseWriter, r *http.Request) {
+	httpRequestsTotal.Inc()
 
 	user, authErr, authStatusCode := lib_auth.AuthenticateUser(r)
 
@@ -155,6 +168,8 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("[AUTH] Insufficient permissions to upload snippets"))
 		return
 	}
+
+	httpRequestsTotal.Inc()
 
 	parseError := r.ParseMultipartForm(32 << 20)
 
@@ -312,8 +327,10 @@ func main() {
 	}
 
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/import/", home)
 
+	router.Path("/metrics").Handler(promhttp.Handler())
+
+	router.HandleFunc("/import/", home)
 	router.HandleFunc("/import/createDB", createDatabase).Methods("POST")
 	router.HandleFunc("/import/upload", uploadImage).Methods("POST")
 
