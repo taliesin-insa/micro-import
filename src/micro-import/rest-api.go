@@ -302,12 +302,6 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func prometheusMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
-	})
-}
-
 func main() {
 	dbEnvVal, dbEnvExists := os.LookupEnv("DATABASE_API_URL")
 	convertEnvVal, convertEnvExists := os.LookupEnv("CONVERSION_API_URL")
@@ -334,7 +328,6 @@ func main() {
 
 	router := mux.NewRouter().StrictSlash(true)
 
-	router.Use(prometheusMiddleware)
 	router.Path("/metrics").Handler(promhttp.Handler())
 
 	router.HandleFunc("/import/", home)
