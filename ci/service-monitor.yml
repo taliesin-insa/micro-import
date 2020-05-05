@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: import-dev
+  namespace: gitlab-managed-apps
+  labels:
+    prometheus: k8s
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      app: import-dev
+  endpoints:
+  - port: api
