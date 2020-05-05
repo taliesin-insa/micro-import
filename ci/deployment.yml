@@ -39,7 +39,7 @@ spec:
               value: "http://conversion-api.gitlab-managed-apps.svc.cluster.local:12345"
           resources:
             requests:
-              cpu: "250m"
+              cpu: "100m"
       volumes:
         - name: file-server
           persistentVolumeClaim:
@@ -87,7 +87,7 @@ spec:
               value: "http://conversion-dev-api.gitlab-managed-apps.svc.cluster.local:12345"
           resources:
             requests:
-              cpu: "250m"
+              cpu: "100m"
       volumes:
         - name: file-server-dev
           persistentVolumeClaim:
