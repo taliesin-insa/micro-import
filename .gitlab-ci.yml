@@ -43,7 +43,7 @@ dev:
     - kubectl config set-context default --cluster=k8s --user=gitlab
     - kubectl config use-context default
     - kubectl apply -f ci/
-    - kubectl set image deployment/import-dev import-dev=${CONTAINER_IMAGE_SHA} --record -n gitlab-managed-apps
+    - kubectl rollout restart deployment/import-dev -n gitlab-managed-apps
 
 production:
   stage: production
@@ -59,4 +59,4 @@ production:
     - kubectl config set-context default --cluster=k8s --user=gitlab
     - kubectl config use-context default
     - kubectl apply -f ci/
-    - kubectl set image deployment/import import=${CONTAINER_IMAGE_SHA} --record -n gitlab-managed-apps
+    - kubectl rollout restart deployment/import -n gitlab-managed-apps
