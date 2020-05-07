@@ -23,6 +23,7 @@ spec:
       containers:
         - name: import
           image: clyde.local:5005/taliesin/micro-import/master:prod
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           volumeMounts:
