@@ -13,6 +13,7 @@ WORKDIR /src/micro-import
 
 # Download dependancies (if you try to build your image without following lines you will see missing packages)
 RUN go get -u github.com/gorilla/mux
+RUN go get -u github.com/stretchr/testify/assert
 RUN go get -u github.com/taliesin-insa/lib-auth
 
 RUN go get -u github.com/prometheus/client_golang/prometheus
