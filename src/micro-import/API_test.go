@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	lib_auth "github.com/taliesin-insa/lib-auth"
 	"image"
 	"image/color"
@@ -20,7 +21,7 @@ import (
 )
 
 var EmptyPiFF = PiFFStruct{
-	Meta:     Meta{
+	Meta: Meta{
 		Type: "line",
 		URL:  "",
 	},
@@ -48,7 +49,7 @@ var EmptyPiFF = PiFFStruct{
 }
 
 type VerifyRequest struct {
-	Token	string
+	Token string
 }
 
 var InsertedPath string
@@ -66,7 +67,7 @@ func MockAuthMicroservice() *httptest.Server {
 
 				if data.Token == "chevreuil" {
 					w.WriteHeader(http.StatusOK)
-					r, _ := json.Marshal(lib_auth.UserData{Username:"morpheus", Role:lib_auth.RoleAdmin})
+					r, _ := json.Marshal(lib_auth.UserData{Username: "morpheus", Role: lib_auth.RoleAdmin})
 					w.Write(r)
 					return
 				} else {
@@ -106,7 +107,6 @@ func MockDatabaseMicroservice() *httptest.Server {
 	return mockedServer
 }
 
-
 func TestMain(m *testing.M) {
 	mockedAuthServer := MockAuthMicroservice()
 
@@ -119,7 +119,7 @@ func TestMain(m *testing.M) {
 		panic("failed to create temp directory")
 	}
 
-	VolumePath = dir+"/"
+	VolumePath = dir + "/"
 
 	code := m.Run()
 
@@ -145,10 +145,7 @@ func TestUploadImageBadAuth(t *testing.T) {
 	createDatabase(wrongAuthRecorder, wrongAuthRequest)
 
 	// status test
-	if status := wrongAuthRecorder.Code; status != http.StatusBadRequest {
-		t.Errorf("[TEST_ERROR] Handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-	}
+	assert.Equal(t, http.StatusBadRequest, wrongAuthRecorder.Code)
 }
 
 func MockConversionMicroservice() *httptest.Server {
@@ -165,7 +162,6 @@ func MockConversionMicroservice() *httptest.Server {
 	return mockedServer
 }
 
-
 func TestCreateDatabaseOK(t *testing.T) {
 
 	/* Create some placeholder files in the shared folder */
@@ -175,7 +171,7 @@ func TestCreateDatabaseOK(t *testing.T) {
 			panic("could not create temp file")
 		}
 
-		file.Write([]byte(strconv.Itoa(i)));
+		file.Write([]byte(strconv.Itoa(i)))
 	}
 
 	/* Mocking Database API Response */
@@ -195,17 +191,11 @@ func TestCreateDatabaseOK(t *testing.T) {
 	DatabaseAPI = mockedDBServer.URL
 	createDatabase(recorder, request)
 
-	if status := recorder.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
-		return
-	}
+	assert.Equal(t, http.StatusOK, recorder.Code)
 
 	files, _ := ioutil.ReadDir(VolumePath)
 
-	if len(files) > 0 {
-		t.Errorf("createDatabase did not clear snippets folder, got %v files in folder, want 0.", len(files))
-	}
+	assert.Len(t, files, 0, "createDatabase did not clear snippets folder")
 
 	mockedDBServer.Close()
 }
@@ -240,10 +230,7 @@ func TestCreateDatabaseErrorErasingSnippets(t *testing.T) {
 
 	createDatabase(recorder, request)
 
-	if status := recorder.Code; status != http.StatusInternalServerError {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusInternalServerError)
-	}
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 
 	VolumePath = saveVolume
 }
@@ -272,11 +259,7 @@ func TestCreateDatabaseErrorFromDBAPI(t *testing.T) {
 	DatabaseAPI = ts.URL
 	createDatabase(recorder, request)
 
-	if status := recorder.Code; status != http.StatusInternalServerError {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusInternalServerError)
-		return
-	}
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 
 }
 
@@ -292,17 +275,9 @@ func TestUploadImageNoMultipartForm(t *testing.T) {
 
 	uploadImage(recorder, request)
 
-	if status := recorder.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-		return
-	}
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 
-	if message := string(recorder.Body.Bytes()) ; message != "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)" {
-		t.Errorf("handler returned wrong response body: got %v want %v",
-			message, "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)")
-		return
-	}
+	assert.Equal(t, "[MICRO-IMPORT] Couldn't parse multipart form (wrong format, network issues ?)", string(recorder.Body.Bytes()))
 
 }
 
@@ -310,7 +285,7 @@ func generateMultipartForm(paramName string) (io.ReadCloser, string) {
 	imageContent := new(bytes.Buffer)
 	body := new(bytes.Buffer)
 
-	pngEncodeErr := png.Encode(imageContent, createImage(200,200))
+	pngEncodeErr := png.Encode(imageContent, createImage(200, 200))
 	if pngEncodeErr != nil {
 		panic("could not generate multipart form")
 	}
@@ -331,14 +306,13 @@ func generateInvalidMultipartForm(paramName string) (io.ReadCloser, string) {
 	return ioutil.NopCloser(body), writer.FormDataContentType()
 }
 
-
 func TestUploadImageInvalidMultipartForm(t *testing.T) {
 	formBody, formContentType := generateMultipartForm("notfile")
 	request := &http.Request{
 		Method: http.MethodPost,
-		Body: formBody,
+		Body:   formBody,
 		Header: map[string][]string{
-			"Content-Type": {formContentType},
+			"Content-Type":  {formContentType},
 			"Authorization": {"chevreuil"},
 		},
 	}
@@ -347,11 +321,7 @@ func TestUploadImageInvalidMultipartForm(t *testing.T) {
 
 	uploadImage(recorder, request)
 
-	if status := recorder.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-		return
-	}
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestUploadImageTooLargeImageSize(t *testing.T) {
@@ -359,7 +329,7 @@ func TestUploadImageTooLargeImageSize(t *testing.T) {
 
 	writer := multipart.NewWriter(body)
 	part, _ := writer.CreateFormFile("file", "sample.png")
-	part.Write(make([]byte, 32 << 22))
+	part.Write(make([]byte, 32<<22))
 
 	writer.Close()
 	formBody := ioutil.NopCloser(body)
@@ -367,9 +337,9 @@ func TestUploadImageTooLargeImageSize(t *testing.T) {
 
 	request := &http.Request{
 		Method: http.MethodPost,
-		Body: formBody,
+		Body:   formBody,
 		Header: map[string][]string{
-			"Content-Type": {formContentType},
+			"Content-Type":  {formContentType},
 			"Authorization": {"chevreuil"},
 		},
 	}
@@ -378,21 +348,16 @@ func TestUploadImageTooLargeImageSize(t *testing.T) {
 
 	uploadImage(recorder, request)
 
-	fmt.Println(recorder.Body)
-	if status := recorder.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-		return
-	}
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
 func TestUploadImageInvalidImageExtension(t *testing.T) {
 	formBody, formContentType := generateInvalidMultipartForm("file")
 	request := &http.Request{
 		Method: http.MethodPost,
-		Body: formBody,
+		Body:   formBody,
 		Header: map[string][]string{
-			"Content-Type": {formContentType},
+			"Content-Type":  {formContentType},
 			"Authorization": {"chevreuil"},
 		},
 	}
@@ -401,13 +366,8 @@ func TestUploadImageInvalidImageExtension(t *testing.T) {
 
 	uploadImage(recorder, request)
 
-	if status := recorder.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-		return
-	}
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 }
-
 
 func TestUploadImageMultipartForm(t *testing.T) {
 
@@ -422,9 +382,9 @@ func TestUploadImageMultipartForm(t *testing.T) {
 	formBody, formContentType := generateMultipartForm("file")
 	request := &http.Request{
 		Method: http.MethodPost,
-		Body: formBody,
+		Body:   formBody,
 		Header: map[string][]string{
-			"Content-Type": {formContentType},
+			"Content-Type":  {formContentType},
 			"Authorization": {"chevreuil"},
 		},
 	}
@@ -433,21 +393,12 @@ func TestUploadImageMultipartForm(t *testing.T) {
 
 	uploadImage(recorder, request)
 
-	if status := recorder.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
-		return
-	}
+	assert.Equal(t, http.StatusOK, recorder.Code)
 
-	if _, err := os.Stat(InsertedPath); err != nil {
-		t.Error("file was not saved to volume")
-		return
-	}
+	_, err := os.Stat(InsertedPath)
+	assert.Nil(t, err, "file was not saved to volume")
 
-	if InsertedRealFilename != "sample.png" {
-		t.Errorf("the name of the file before renaming was not correctly saved, got %v want %v", InsertedRealFilename, "sample.txt")
-		return
-	}
+	assert.Equal(t, "sample.png", InsertedRealFilename, "the name of the file before renaming was not correctly saved")
 
 	os.RemoveAll(VolumePath)
 	mockedConversionServer.Close()
